@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAllowedUser() {
+      return request.auth != null
+        && (request.auth.uid == 'Y2FGPwxkZZPRkcWwqs1OFjzHRao1'
+          || request.auth.uid == '9kw8hR5wOLQuPvEmQCJiTX0nQj83');
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAllowedUser();
+
+      allow create: if isAllowedUser()
+        && request.resource.data.keys().hasOnly(['text', 'senderId', 'createdAt'])
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

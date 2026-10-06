@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4f4f4" />
+  <title>Private Chat</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <section id="loginView" class="card login-card" aria-labelledby="loginTitle">
+      <div class="brand-block">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <h1 id="loginTitle">Private Chat</h1>
+        <p>Autentifică-te pentru a continua.</p>
+      </div>
+
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+
+        <label for="password">Parolă</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button id="loginButton" class="primary-button" type="submit">Intră</button>
+        <p id="loginError" class="form-message error-message" role="alert" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section id="chatView" class="chat-card hidden" aria-label="Chat privat">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">PRIVATE CHAT</p>
+          <h1 id="chatTitle">Conversație</h1>
+        </div>
+        <div class="header-actions">
+          <span id="currentUserLabel" class="user-label"></span>
+          <button id="logoutButton" class="text-button" type="button">Ieșire</button>
+        </div>
+      </header>
+
+      <div id="connectionBanner" class="connection-banner hidden" role="status" aria-live="polite"></div>
+
+      <div id="messagesScroller" class="messages-scroller" aria-live="polite" aria-label="Mesaje">
+        <div id="loadOlderWrap" class="load-older-wrap hidden">
+          <button id="loadOlderButton" class="secondary-button" type="button">Mesaje mai vechi</button>
+        </div>
+        <div id="messages" class="messages"></div>
+        <div id="emptyState" class="empty-state hidden">Nu există mesaje încă.</div>
+      </div>
+
+      <form id="messageForm" class="message-form">
+        <label class="sr-only" for="messageInput">Mesaj</label>
+        <textarea
+          id="messageInput"
+          name="message"
+          rows="1"
+          maxlength="2000"
+          placeholder="Scrie un mesaj..."
+          autocomplete="off"
+          required
+        ></textarea>
+        <button id="sendButton" class="send-button" type="submit" aria-label="Trimite mesajul">Trimite</button>
+      </form>
+    </section>
+  </main>
+
+  <noscript>Acest site are nevoie de JavaScript pentru chatul live.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
