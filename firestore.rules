@@ -8,16 +8,40 @@ service cloud.firestore {
           || request.auth.uid == '9kw8hR5wOLQuPvEmQCJiTX0nQj83');
     }
 
+    function isAllowedUid(uid) {
+      return uid == 'Y2FGPwxkZZPRkcWwqs1OFjzHRao1'
+        || uid == '9kw8hR5wOLQuPvEmQCJiTX0nQj83';
+    }
+
+    function hasValidReply() {
+      return !('replyTo' in request.resource.data)
+        || (
+          request.resource.data.replyTo is map
+          && request.resource.data.replyTo.keys().hasAll(['id', 'text', 'senderId'])
+          && request.resource.data.replyTo.keys().hasOnly(['id', 'text', 'senderId'])
+          && request.resource.data.replyTo.id is string
+          && request.resource.data.replyTo.id.size() > 0
+          && request.resource.data.replyTo.id.size() <= 256
+          && request.resource.data.replyTo.text is string
+          && request.resource.data.replyTo.text.size() > 0
+          && request.resource.data.replyTo.text.size() <= 2000
+          && request.resource.data.replyTo.senderId is string
+          && isAllowedUid(request.resource.data.replyTo.senderId)
+        );
+    }
+
     match /messages/{messageId} {
       allow read: if isAllowedUser();
 
       allow create: if isAllowedUser()
-        && request.resource.data.keys().hasOnly(['text', 'senderId', 'createdAt'])
+        && request.resource.data.keys().hasAll(['text', 'senderId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['text', 'senderId', 'createdAt', 'replyTo'])
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        && hasValidReply();
 
       allow update, delete: if false;
     }

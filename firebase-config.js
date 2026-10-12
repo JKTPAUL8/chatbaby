@@ -1,5 +1,5 @@
-// Completează acest fișier cu datele din Firebase Console > Project settings > Your apps > Web app.
-// Firebase Web API keys sunt identificatori de configurare pentru client; securitatea reală este în firestore.rules.
+// Firebase web configuration. These client-side values are expected to be visible in the browser.
+// Actual access control is enforced by Firebase Authentication and firestore.rules.
 
 export const firebaseConfig = {
   apiKey: "AIzaSyBAfEgkKFrCHIH2yGVoXyQ_TUXs8JO_4E4",
@@ -11,8 +11,8 @@ export const firebaseConfig = {
   measurementId: "G-NT1GELVH54"
 };
 
-// Pune aici UID-urile celor două conturi create manual în Firebase Authentication.
-// Numele sunt doar pentru afișare în chat și pot fi schimbate.
+// The two accounts that are allowed to use the chat.
+// These names are display-only and can be changed without changing the Firebase accounts.
 export const allowedUsers = [
   { uid: "Y2FGPwxkZZPRkcWwqs1OFjzHRao1", name: "User 1" },
   { uid: "9kw8hR5wOLQuPvEmQCJiTX0nQj83", name: "User 2" }

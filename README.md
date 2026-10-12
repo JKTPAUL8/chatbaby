@@ -1,130 +1,67 @@
 # Private Chat — GitHub Pages + Firebase
 
-Chat minimalist pentru exact doi utilizatori, cu:
+A minimal private chat for exactly two users.
 
-- autentificare Email/Password;
-- mesaje live fără refresh;
-- istoric persistent în Cloud Firestore;
-- ultimele 50 de mesaje încărcate la intrare;
-- încărcare paginată pentru mesaje mai vechi;
-- acces la baza de date doar pentru cele două UID-uri aprobate;
-- interfață responsive pentru telefon și desktop;
-- fără buton de înregistrare publică.
+## Features
 
-## Fișiere
+- Email/password sign-in
+- Live messages without refreshing
+- Persistent Cloud Firestore history
+- Pagination for older messages
+- Access restricted to the two approved Firebase UIDs
+- Responsive desktop/mobile layout
+- Light and dark themes, remembered on each device
+- Reply to a specific message
+- No public registration
 
-- `index.html` — interfața;
-- `styles.css` — designul;
-- `app.js` — autentificare, realtime și istoric;
-- `firebase-config.js` — configurația proiectului Firebase și cele două UID-uri;
-- `firestore.rules` — regulile de securitate pentru Firestore;
-- `.nojekyll` — publicare directă pe GitHub Pages.
+## Important update for v2
 
-## 1. Creează proiectul Firebase
+Reply messages add a `replyTo` object to Firestore documents. Because of that, you **must publish the updated `firestore.rules` file** before testing replies. Normal messages will continue to work with the old rules, but replies will be rejected until the new rules are published.
 
-1. Intră în Firebase Console și creează un proiect nou.
-2. Rămâi pe planul **Spark** dacă vrei varianta fără costuri.
-3. Din Project Overview, adaugă o aplicație **Web**.
-4. Firebase îți va afișa un obiect `firebaseConfig`.
-5. Copiază valorile în `firebase-config.js`.
+## Files
 
-Nu pune parolele utilizatorilor în niciun fișier al site-ului.
+- `index.html` — user interface
+- `styles.css` — light/dark styling and responsive layout
+- `app.js` — authentication, realtime sync, history, theme and replies
+- `firebase-config.js` — Firebase project configuration and the two allowed UIDs
+- `firestore.rules` — Firestore security rules
+- `.nojekyll` — direct GitHub Pages publishing
 
-## 2. Activează autentificarea
+## Updating the existing GitHub Pages site
 
-1. Firebase Console → **Authentication** → **Sign-in method**.
-2. Activează **Email/Password**.
-3. Mergi la **Authentication → Users**.
-4. Creează manual exact cele două conturi pe care vrei să le folosești.
-5. Copiază UID-ul fiecărui cont.
-6. În `firebase-config.js`, înlocuiește:
+Upload/replace these files in the root of the existing `chatbaby` repository:
 
-```js
-{ uid: "PASTE_UID_USER_1", name: "User 1" }
-{ uid: "PASTE_UID_USER_2", name: "User 2" }
-```
+- `index.html`
+- `styles.css`
+- `app.js`
+- `firebase-config.js`
+- `firestore.rules`
+- `README.md`
 
-cu UID-urile reale.
+GitHub Pages will redeploy automatically after the commit.
 
-## 3. Creează baza Firestore
+## Publish the new Firestore rules
 
-1. Firebase Console → **Firestore Database** → Create database.
-2. Alege **Standard edition**.
-3. Alege o regiune rezonabilă pentru cei doi utilizatori.
-4. Poți porni în Production mode; regulile de mai jos vor înlocui regulile inițiale.
+1. Open Firebase Console.
+2. Go to **Firestore Database → Rules**.
+3. Replace the current rules with the contents of `firestore.rules`.
+4. Click **Publish**.
 
-Nu trebuie să creezi manual colecția `messages`. Ea va fi creată automat la primul mesaj valid.
+The rules still allow only the same two Firebase UIDs. They now also allow an optional, validated `replyTo` object when a message is created. Editing and deleting existing messages remain disabled.
 
-## 4. Publică regulile de securitate
+## Reply behavior
 
-1. Deschide fișierul `firestore.rules`.
-2. Înlocuiește `PASTE_UID_USER_1` și `PASTE_UID_USER_2` cu aceleași UID-uri reale.
-3. Firebase Console → Firestore Database → **Rules**.
-4. Înlocuiește regulile existente cu conținutul fișierului.
-5. Apasă **Publish**.
+Every message has a **Reply** action. Selecting it opens a reply preview above the composer. The sent message stores a small snapshot of the original message (`id`, `text`, and `senderId`), so the reply remains visible after reload and does not require another Firestore read.
 
-Aceste reguli permit citirea și trimiterea mesajelor numai celor două conturi aprobate. Editarea și ștergerea mesajelor sunt blocate.
+Press **Escape** while composing to cancel the selected reply.
 
-## 5. Adaugă domeniul GitHub Pages în Firebase Authentication
+## Theme behavior
 
-După ce știi adresa GitHub Pages, de exemplu:
+Use the **Light / Dark** switch on either the login screen or chat header. The selected theme is stored in `localStorage` on that device. If no preference has been saved yet, the site initially follows the device's system color scheme.
 
-```text
-https://NUMEUTILIZATOR.github.io/private-chat/
-```
+## Security notes
 
-în Firebase mergi la:
-
-**Authentication → Settings → Authorized domains → Add domain**
-
-și adaugă doar domeniul:
-
-```text
-NUMEUTILIZATOR.github.io
-```
-
-Nu include `https://` și nici `/private-chat/`.
-
-## 6. Publică pe GitHub Pages
-
-1. Creează un repository public nou, de exemplu `private-chat`.
-2. Urcă toate fișierele din acest folder în rădăcina repository-ului.
-3. GitHub → repository → **Settings → Pages**.
-4. La **Build and deployment**, alege **Deploy from a branch**.
-5. Branch: `main`.
-6. Folder: `/ (root)`.
-7. Save.
-
-Adresa va fi de forma:
-
-```text
-https://NUMEUTILIZATOR.github.io/private-chat/
-```
-
-## 7. Test obligatoriu
-
-Pe dispozitivul 1:
-
-1. intră pe site;
-2. autentifică User 1;
-3. trimite un mesaj.
-
-Pe dispozitivul 2, ideal pe altă rețea:
-
-1. intră pe aceeași adresă;
-2. autentifică User 2;
-3. verifică dacă mesajul apare fără refresh;
-4. răspunde;
-5. închide ambele browsere;
-6. redeschide site-ul și verifică dacă istoricul este păstrat.
-
-## Observații de securitate
-
-- `firebaseConfig` din aplicația web nu este o parolă și va fi vizibil în browser; accesul este controlat de Firebase Authentication + Firestore Security Rules.
-- Parolele celor doi utilizatori nu trebuie puse niciodată în GitHub sau în JavaScript.
-- Repository-ul poate fi public, dar conversația nu devine publică dacă regulile Firestore sunt configurate corect.
-- Nu activa reguli de forma `allow read, write: if true;`.
-
-## Cost
-
-Pentru doi utilizatori și un chat obișnuit, proiectul este proiectat să rămână în limitele gratuite ale planului Firebase Spark și ale GitHub Pages. Dacă depășești limitele gratuite ale serviciului Firebase, pe Spark serviciul afectat se poate opri până la resetarea cotei în loc să înceapă automat facturarea.
+- The Firebase web configuration is client-side configuration, not a secret.
+- Never place user passwords, service-account JSON files, or private keys in GitHub.
+- Conversation access is enforced by Firebase Authentication and Firestore Security Rules.
+- The repository can be public without making the Firestore conversation public, provided the security rules are correctly published.

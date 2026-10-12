@@ -39,6 +39,12 @@ const messageForm = document.getElementById("messageForm");
 const messageInput = document.getElementById("messageInput");
 const sendButton = document.getElementById("sendButton");
 const connectionBanner = document.getElementById("connectionBanner");
+const replyComposer = document.getElementById("replyComposer");
+const replyAuthor = document.getElementById("replyAuthor");
+const replyPreviewText = document.getElementById("replyPreviewText");
+const cancelReplyButton = document.getElementById("cancelReplyButton");
+const themeButtons = [...document.querySelectorAll(".theme-toggle")];
+const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
 let app;
 let auth;
@@ -49,6 +55,7 @@ let oldestCursor = null;
 let hasMoreMessages = true;
 let loadingOlder = false;
 let initialSnapshotHandled = false;
+let selectedReply = null;
 const messageCache = new Map();
 
 function configurationLooksComplete() {
@@ -75,6 +82,10 @@ function getAllowedUser(uid) {
   return allowedUsers.find((user) => user.uid === uid) ?? null;
 }
 
+function getDisplayName(uid) {
+  return getAllowedUser(uid)?.name ?? "Unknown user";
+}
+
 function showLogin(message = "") {
   loginView.classList.remove("hidden");
   chatView.classList.add("hidden");
@@ -89,6 +100,26 @@ function showChat() {
 function setConnectionMessage(message = "") {
   connectionBanner.textContent = message;
   connectionBanner.classList.toggle("hidden", !message);
+}
+
+function resetReply() {
+  selectedReply = null;
+  replyComposer.classList.add("hidden");
+  replyAuthor.textContent = "Replying to";
+  replyPreviewText.textContent = "";
+}
+
+function setReplyTo(message) {
+  selectedReply = {
+    id: message.id,
+    text: message.text,
+    senderId: message.senderId
+  };
+
+  replyAuthor.textContent = `Replying to ${getDisplayName(message.senderId)}`;
+  replyPreviewText.textContent = message.text;
+  replyComposer.classList.remove("hidden");
+  messageInput.focus();
 }
 
 function resetChatState() {
@@ -106,10 +137,11 @@ function resetChatState() {
   loadOlderWrap.classList.add("hidden");
   emptyState.classList.add("hidden");
   setConnectionMessage("");
+  resetReply();
 }
 
 function formatMessageTime(date) {
-  return new Intl.DateTimeFormat("ro-RO", {
+  return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
@@ -125,10 +157,10 @@ function formatDayLabel(date) {
   const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const differenceInDays = Math.round((today - target) / 86400000);
 
-  if (differenceInDays === 0) return "Astăzi";
-  if (differenceInDays === 1) return "Ieri";
+  if (differenceInDays === 0) return "Today";
+  if (differenceInDays === 1) return "Yesterday";
 
-  return new Intl.DateTimeFormat("ro-RO", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: target.getFullYear() !== today.getFullYear() ? "numeric" : undefined
@@ -138,6 +170,35 @@ function formatDayLabel(date) {
 function timestampToDate(timestamp) {
   if (timestamp?.toDate) return timestamp.toDate();
   return new Date();
+}
+
+function scrollToRepliedMessage(messageId) {
+  const target = messagesElement.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+  if (!target) return;
+
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  target.classList.remove("flash");
+  requestAnimationFrame(() => target.classList.add("flash"));
+  window.setTimeout(() => target.classList.remove("flash"), 1100);
+}
+
+function createReplyPreview(replyTo) {
+  const preview = document.createElement("button");
+  preview.className = "reply-preview";
+  preview.type = "button";
+  preview.title = "Jump to replied message";
+
+  const author = document.createElement("span");
+  author.className = "reply-preview-author";
+  author.textContent = getDisplayName(replyTo.senderId);
+
+  const text = document.createElement("span");
+  text.className = "reply-preview-text";
+  text.textContent = replyTo.text;
+
+  preview.append(author, text);
+  preview.addEventListener("click", () => scrollToRepliedMessage(replyTo.id));
+  return preview;
 }
 
 function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
@@ -172,9 +233,14 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
 
     const row = document.createElement("div");
     row.className = `message-row${message.senderId === activeUser?.uid ? " own" : ""}`;
+    row.dataset.messageId = message.id;
 
     const bubble = document.createElement("article");
     bubble.className = "message-bubble";
+
+    if (message.replyTo?.id && message.replyTo?.text && message.replyTo?.senderId) {
+      bubble.append(createReplyPreview(message.replyTo));
+    }
 
     const text = document.createElement("p");
     text.className = "message-text";
@@ -182,8 +248,18 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
 
     const meta = document.createElement("div");
     meta.className = "message-meta";
-    meta.textContent = formatMessageTime(messageDate);
 
+    const replyButton = document.createElement("button");
+    replyButton.className = "reply-action";
+    replyButton.type = "button";
+    replyButton.textContent = "Reply";
+    replyButton.setAttribute("aria-label", `Reply to message from ${getDisplayName(message.senderId)}`);
+    replyButton.addEventListener("click", () => setReplyTo(message));
+
+    const time = document.createElement("span");
+    time.textContent = formatMessageTime(messageDate);
+
+    meta.append(replyButton, time);
     bubble.append(text, meta);
     row.append(bubble);
     fragment.append(row);
@@ -239,13 +315,17 @@ function startRealtimeMessages() {
         initialSnapshotHandled = true;
       }
 
-      setConnectionMessage(snapshot.metadata.fromCache ? "Conexiune instabilă — se afișează datele disponibile local." : "");
+      setConnectionMessage(
+        snapshot.metadata.fromCache
+          ? "Connection is unstable — showing locally available data."
+          : ""
+      );
       renderMessages({ forceBottom: firstLoad });
       updateLoadOlderVisibility();
     },
     (error) => {
       console.error(error);
-      setConnectionMessage("Nu pot sincroniza mesajele. Verifică conexiunea și configurarea Firebase.");
+      setConnectionMessage("Messages could not be synchronized. Check your connection and Firebase configuration.");
     }
   );
 }
@@ -255,7 +335,7 @@ async function loadOlderMessages() {
 
   loadingOlder = true;
   loadOlderButton.disabled = true;
-  loadOlderButton.textContent = "Se încarcă...";
+  loadOlderButton.textContent = "Loading...";
 
   try {
     const olderQuery = query(
@@ -283,11 +363,11 @@ async function loadOlderMessages() {
     updateLoadOlderVisibility();
   } catch (error) {
     console.error(error);
-    setConnectionMessage("Mesajele mai vechi nu au putut fi încărcate.");
+    setConnectionMessage("Older messages could not be loaded.");
   } finally {
     loadingOlder = false;
     loadOlderButton.disabled = false;
-    loadOlderButton.textContent = "Mesaje mai vechi";
+    loadOlderButton.textContent = "Load older messages";
   }
 }
 
@@ -295,17 +375,17 @@ async function handleLogin(event) {
   event.preventDefault();
   loginError.textContent = "";
   loginButton.disabled = true;
-  loginButton.textContent = "Se conectează...";
+  loginButton.textContent = "Signing in...";
 
   try {
     await signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
     passwordInput.value = "";
   } catch (error) {
     console.error(error);
-    loginError.textContent = "Email sau parolă incorectă.";
+    loginError.textContent = "Incorrect email or password.";
   } finally {
     loginButton.disabled = false;
-    loginButton.textContent = "Intră";
+    loginButton.textContent = "Sign in";
   }
 }
 
@@ -316,20 +396,31 @@ async function handleSendMessage(event) {
   if (!text || !activeUser) return;
 
   if (text.length > chatConfig.maxMessageLength) {
-    setConnectionMessage(`Mesajul poate avea maximum ${chatConfig.maxMessageLength} de caractere.`);
+    setConnectionMessage(`A message can contain up to ${chatConfig.maxMessageLength} characters.`);
     return;
   }
 
   sendButton.disabled = true;
 
   try {
-    await addDoc(collection(db, "messages"), {
+    const messageData = {
       text,
       senderId: activeUser.uid,
       createdAt: serverTimestamp()
-    });
+    };
+
+    if (selectedReply) {
+      messageData.replyTo = {
+        id: selectedReply.id,
+        text: selectedReply.text,
+        senderId: selectedReply.senderId
+      };
+    }
+
+    await addDoc(collection(db, "messages"), messageData);
 
     messageInput.value = "";
+    resetReply();
     autoResizeTextarea();
     setConnectionMessage("");
     requestAnimationFrame(() => {
@@ -337,7 +428,7 @@ async function handleSendMessage(event) {
     });
   } catch (error) {
     console.error(error);
-    setConnectionMessage("Mesajul nu a putut fi trimis. Încearcă din nou.");
+    setConnectionMessage("The message could not be sent. Please try again.");
   } finally {
     sendButton.disabled = false;
     messageInput.focus();
@@ -350,6 +441,12 @@ function autoResizeTextarea() {
 }
 
 function handleMessageKeydown(event) {
+  if (event.key === "Escape" && selectedReply) {
+    event.preventDefault();
+    resetReply();
+    return;
+  }
+
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     if (typeof messageForm.requestSubmit === "function") {
@@ -358,12 +455,42 @@ function handleMessageKeydown(event) {
   }
 }
 
+function applyTheme(theme, save = true) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute("content", nextTheme === "dark" ? "#0d0f12" : "#f3f3f1");
+  }
+
+  for (const button of themeButtons) {
+    const label = button.querySelector(".theme-label");
+    if (label) label.textContent = nextTheme === "dark" ? "Light" : "Dark";
+    button.setAttribute(
+      "aria-label",
+      nextTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+    );
+  }
+
+  if (save) {
+    try {
+      localStorage.setItem("chat-theme", nextTheme);
+    } catch (_) {
+      // Theme still works for this session even if storage is unavailable.
+    }
+  }
+}
+
+function toggleTheme() {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+}
+
 async function handleAuthenticatedUser(user) {
   const allowedUser = getAllowedUser(user.uid);
 
   if (!allowedUser) {
     await signOut(auth);
-    showLogin("Acest cont nu are acces la chat.");
+    showLogin("This account does not have access to the chat.");
     return;
   }
 
@@ -375,8 +502,11 @@ async function handleAuthenticatedUser(user) {
 }
 
 async function initialize() {
+  applyTheme(document.documentElement.dataset.theme, false);
+  themeButtons.forEach((button) => button.addEventListener("click", toggleTheme));
+
   if (!configurationLooksComplete()) {
-    showLogin("Site-ul nu este configurat încă. Completează firebase-config.js și UID-urile celor doi utilizatori.");
+    showLogin("The site is not configured yet. Complete firebase-config.js and both user UIDs.");
     loginForm.querySelectorAll("input, button").forEach((element) => {
       element.disabled = true;
     });
@@ -390,13 +520,14 @@ async function initialize() {
   try {
     await setPersistence(auth, browserLocalPersistence);
   } catch (error) {
-    console.warn("Persistența autentificării nu a putut fi setată:", error);
+    console.warn("Authentication persistence could not be enabled:", error);
   }
 
   loginForm.addEventListener("submit", handleLogin);
   logoutButton.addEventListener("click", () => signOut(auth));
   messageForm.addEventListener("submit", handleSendMessage);
   loadOlderButton.addEventListener("click", loadOlderMessages);
+  cancelReplyButton.addEventListener("click", resetReply);
   messageInput.addEventListener("input", autoResizeTextarea);
   messageInput.addEventListener("keydown", handleMessageKeydown);
 
@@ -414,5 +545,5 @@ async function initialize() {
 
 initialize().catch((error) => {
   console.error(error);
-  showLogin("A apărut o eroare la inițializarea aplicației.");
+  showLogin("An error occurred while initializing the application.");
 });
